@@ -149,7 +149,7 @@ class nnUNetTrainer(object):
         self.oversample_foreground_percent = 0.33
         self.num_iterations_per_epoch = 250
         self.num_val_iterations_per_epoch = 50
-        self.num_epochs = 1000
+        self.num_epochs = 50
         self.current_epoch = 0
         self.enable_deep_supervision = True
 
@@ -324,6 +324,7 @@ class nnUNetTrainer(object):
         should be generated. label_manager takes care of all that for you.)
 
         """
+        #num_output_channels = 8 # this my favorite magic number
         return get_network_from_plans(
             architecture_class_name,
             arch_init_kwargs,
@@ -992,8 +993,36 @@ class nnUNetTrainer(object):
         # So autocast will only be active if we have a cuda device.
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
-            # del data
-            l = self.loss(output, target)
+            print(len(output), output[0].shape)
+
+            # remap output to the target space
+            # count unique labels in target list
+            nb_unique_labels = len(np.unique(target[0].cpu().numpy()))
+            map_to_dataset_0 = {0: 0, 1: 1, 2: 1, 3: 1,
+                                                4: 1, 5: 1, 6: 0, 7: 0,
+                                                8: 0, 9: 0, 10: 0, 11: 0,
+                                                12: 1}
+                            
+            if nb_unique_labels == 2:
+                # Adjust for your actual number of output channels (0-8 here)
+                channel_map = [0, 1, 1, 1, 1, 1, 0, 0, 0]  # Mapped according to 9 logits
+
+                # Convert channel_map to a tensor
+                channel_map_tensor = torch.tensor(channel_map, dtype=torch.int64)
+
+                # Initialize the new output tensor with zeros
+                remapped_output = torch.zeros((output[0].shape[0], 2, *output[0].shape[2:]), device=output[0].device)
+
+                # Map and sum the logits
+                for i, mapping in enumerate(channel_map):
+                    remapped_output[:, mapping] += output[0][:, i]
+
+                output[0] = remapped_output
+
+                l = self.loss(output, target)
+            else:
+                # del data
+                l = self.loss(output, target)
 
         if self.grad_scaler is not None:
             self.grad_scaler.scale(l).backward()

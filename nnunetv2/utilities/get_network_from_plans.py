@@ -6,7 +6,7 @@ from nnunetv2.utilities.find_class_by_name import recursive_find_python_class
 from batchgenerators.utilities.file_and_folder_operations import join
 
 
-def get_network_from_plans(arch_class_name, arch_kwargs, arch_kwargs_req_import, input_channels, output_channels,
+def get_network_from_plans(arch_class_name, arch_kwargs, arch_kwargs_req_import, input_channels, output_channels=8,
                            allow_init=True, deep_supervision: Union[bool, None] = None):
     network_class = arch_class_name
     architecture_kwargs = dict(**arch_kwargs)
@@ -43,7 +43,7 @@ def get_network_from_plans(arch_class_name, arch_kwargs, arch_kwargs_req_import,
     return network
 
 if __name__ == "__main__":
-    import torch
+    import torch  
 
     model = get_network_from_plans(
         arch_class_name="dynamic_network_architectures.architectures.unet.ResidualEncoderUNet",
@@ -69,6 +69,8 @@ if __name__ == "__main__":
         allow_init=True,
         deep_supervision=True,
     )
-    data = torch.rand((8, 1, 256, 256))
-    target = torch.rand(size=(8, 1, 256, 256))
+    data = torch.rand((1, 1, 256, 256))
+    target = torch.rand(size=(1, 1, 256, 256))
     outputs = model(data) # this should be a list of torch.Tensor
+    print(data.shape, target.shape, len(outputs), outputs[0].shape)
+    print(outputs)
